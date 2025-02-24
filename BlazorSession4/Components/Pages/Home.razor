@@ -1,0 +1,120 @@
+﻿@page "/"
+@using BlazorSession4.DB
+@using Microsoft.EntityFrameworkCore
+@using Net.Codecrete.QrCodeGenerator
+@inject User02Context db;
+
+<div class="container">
+    <div class="row">
+        <div class="col-sm-2">
+            <img src="/Logo.png" width="75"/>
+        </div>
+        <div class="col-sm-10 align-items-center d-flex">
+            <input style="width:100%" type="text" 
+            @bind-value="Search" @bind-value:event="oninput" placeholder="Введите для поиска" />
+        </div>
+    </div>
+
+    <div class="row">
+        <b>Сотрудники</b>
+    </div>
+    <div class="row flex-nowrap overflow-auto">
+        @if (employees.Count > 0)
+        {
+            @foreach (var worker in employees)
+            {
+                <div class="col-sm-2 bg-success m-3 text-light">
+                    <div class="d-inline-block">
+                        <b>@worker.FirstName</b>
+                        <b>@worker.LastName</b>
+                    </div>
+                    <p><b>@worker.Patronymic</b></p>
+                    <p>@worker.IdRoleNavigation?.Title</p>
+                    <p style="text-decoration:underline">@worker.CorporateEmail</p>
+                    <p>@worker.WorkPhone</p>
+                    <div class="d-inline-block">
+                        <p>
+                            @worker.BirthdayDate?.ToString("dd MMMM")
+                            <img width="25" src="/workervcard.png" @onclick="(()=>QRCode(worker))" />
+                        </p>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <b>Сотрудников с таким именем не нашлось :(</b>
+        }
+        <div @onclick="QrCodeClick" style="@invis; display:flex; position:absolute; top:0; left:0; align-items:center; justify-content:center; width:100%; height:100%;">
+           <div style="width:200px">
+                @((MarkupString)qrcode)
+           </div>
+        </div>
+
+    </div>
+
+    <div class="row">
+
+    </div>
+
+</div>
+
+@code
+{
+    List<Employee> employees;
+
+    string qrcode = "";
+    string invis = "visibility:collapse;z-index:-1";
+
+    string _search = "";
+    string Search { 
+        get => _search; 
+        set
+        {
+            _search = value;
+            StartSearch();
+        }
+    }
+
+    void QrCodeClick()
+    {
+        invis = "visibility:collapse;z-index:-1";
+    }
+
+    void QRCode(Employee employee)
+    {
+        string message = 
+         "BEGIN:VCARD\n" +
+         "VERSION:3.0\n" +
+         $"N:{employee.LastName}\n" +
+         $"FN:{employee.FirstName}\n" +
+         "ORG:ГК Дороги России\n" +
+         $"TITLE:{employee.IdRoleNavigation.Title}\n" +
+         $"TEL;WORK;VOICE:{employee.WorkPhone}\n" +
+         $"TEL;CELL:{employee.PersonalPhone}\n" +
+         $"EMAIL;WORK;INTERNET:{employee.CorporateEmail}\n" +
+         "END:VCAR\n";
+        var qr = QrCode.EncodeText(message, QrCode.Ecc.Medium);
+        qrcode = qr.ToSvgString(4);
+
+        invis = "z-index:100";
+    }
+
+    void StartSearch()
+    {
+        var x = _search.ToLower();
+        employees = db.Employees.Include(s=>s.IdRoleNavigation).Where(s => 
+            s.LastName.ToLower().Contains(x) ||
+            s.FirstName.ToLower().Contains(x)
+        ).ToList();
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        StartSearch();
+
+    }
+
+}

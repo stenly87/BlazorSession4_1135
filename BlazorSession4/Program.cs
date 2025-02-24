@@ -2,7 +2,7 @@ using BlazorSession4.Components;
 using BlazorSession4.DB;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Services.AddHttpClient();
 builder.Services.AddDbContext<User02Context>();
 // Add services to the container.
 builder.Services.AddRazorComponents()

@@ -2,7 +2,9 @@
 @using BlazorSession4.DB
 @using Microsoft.EntityFrameworkCore
 @using Net.Codecrete.QrCodeGenerator
+@using System.Xml.Linq
 @inject User02Context db;
+@inject HttpClient client;
 
 <div class="container">
     <div class="row">
@@ -16,7 +18,7 @@
     </div>
 
     <div class="row">
-        <b>Сотрудники</b>
+        <b class="m-3">Сотрудники</b>
     </div>
     <div class="row flex-nowrap overflow-auto">
         @if (employees.Count > 0)
@@ -54,6 +56,40 @@
     </div>
 
     <div class="row">
+        <div class="col-sm-4">
+            <b class ="m-3">События</b>
+
+        </div>
+        <div class="col-sm-8">
+            <b class="m-3">Новости</b>
+            <div class="container">
+            <div class="row">
+            @if (rssItems.Count > 0)
+            {
+                @foreach (var news in rssItems)
+                {
+                    <div class="col-sm-5 m-3" >
+                        <div class="card" style="width:100%">
+                            <div class="card-header justify-content-center d-flex">
+                                <img src="@news.Image" style="height:200px"/>
+                            </div>
+                            <div class="card-body">
+                                <p><b>@news.Title</b></p>
+                                <p>@news.Description</p>
+                                <p><b>@news.PubDate.ToShortDateString()</b></p>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <b>Новостей нет</b>    
+            
+            }
+            </div>
+            </div>
+        </div>
 
     </div>
 
@@ -61,7 +97,8 @@
 
 @code
 {
-    List<Employee> employees;
+    List<Employee> employees = new();
+    List<RssItem> rssItems = new();
 
     string qrcode = "";
     string invis = "visibility:collapse;z-index:-1";
@@ -107,12 +144,43 @@
             s.LastName.ToLower().Contains(x) ||
             s.FirstName.ToLower().Contains(x)
         ).ToList();
+
+        StartRss();
+    }
+
+    async void StartRss()
+    {
+        var x = _search.ToLower();
+
+        string rss = await client.GetStringAsync("Rss");
+
+        var document = XDocument.Parse(rss);
+        var items = document.Descendants("item");
+        List<RssItem> result = new();
+        foreach (var item in items)
+        {
+            result.Add(new RssItem
+                {
+                    Title = item.Element("title").Value,
+                    Author = item.Element("author").Value,
+                    Category = item.Element("category").Value,
+                    Description = item.Element("description").Value,
+                    Link = item.Element("link").Value,
+                    PubDate = DateTime.Parse(item.Element("pubDate").Value),
+                    Image = item.Element("enclosure").Attribute("url").Value,
+                });
+        }
+
+        rssItems = result.Where(s => s.Title.ToLower().Contains(x)).ToList();
+
+        InvokeAsync(StateHasChanged);
     }
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
 
+        client.BaseAddress = new Uri("http://localhost:5000/");
         StartSearch();
 
     }

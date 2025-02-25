@@ -3,17 +3,20 @@
 @using Microsoft.EntityFrameworkCore
 @using Net.Codecrete.QrCodeGenerator
 @using System.Xml.Linq
+@implements IDisposable
+
 @inject User02Context db;
 @inject HttpClient client;
+@inject NavigationManager nav;
 
 <div class="container">
     <div class="row">
         <div class="col-sm-2">
-            <img src="/Logo.png" width="75"/>
+            <img src="/Logo.png" width="75" />
         </div>
         <div class="col-sm-10 align-items-center d-flex">
-            <input style="width:100%" type="text" 
-            @bind-value="Search" @bind-value:event="oninput" placeholder="Введите для поиска" />
+            <input style="width:100%" type="text"
+                   @bind-value="Search" @bind-value:event="oninput" placeholder="Введите для поиска" />
         </div>
     </div>
 
@@ -45,49 +48,76 @@
         }
         else
         {
-            <b>Сотрудников с таким именем не нашлось :(</b>
+            <p>Сотрудников с таким именем не нашлось :(</p>
         }
         <div @onclick="QrCodeClick" style="@invis; display:flex; position:absolute; top:0; left:0; align-items:center; justify-content:center; width:100%; height:100%;">
-           <div style="width:200px">
+            <div style="width:200px">
                 @((MarkupString)qrcode)
-           </div>
+            </div>
         </div>
 
     </div>
 
     <div class="row">
         <div class="col-sm-4">
-            <b class ="m-3">События</b>
-
-        </div>
-        <div class="col-sm-8">
-            <b class="m-3">Новости</b>
-            <div class="container">
-            <div class="row">
-            @if (rssItems.Count > 0)
+            <b class="m-3">События</b>
+            @if (eventItems.Count != 0)
             {
-                @foreach (var news in rssItems)
+                @foreach (var item in eventItems)
                 {
-                    <div class="col-sm-5 m-3" >
-                        <div class="card" style="width:100%">
-                            <div class="card-header justify-content-center d-flex">
-                                <img src="@news.Image" style="height:200px"/>
-                            </div>
-                            <div class="card-body">
-                                <p><b>@news.Title</b></p>
-                                <p>@news.Description</p>
-                                <p><b>@news.PubDate.ToShortDateString()</b></p>
+                    <div class="card m-3 bg-success text-light">
+                        <div class="card-body">
+                            <b>@item.Summary</b>
+                            <p>@item.Description</p>
+                        </div>
+                        <div class="card-footer">
+                            <div class="row">
+                                <div class="col">
+                                    <p>
+                                        <img src="/eventics.png" width="25" @onclick="(()=>EventIcsDownload(item))" />
+                                        @item?.DtStart.ToShortDateString()
+                                    </p>
+                                </div>
+                                <div class="col">
+                                    @item?.Organizer
+                                </div>
                             </div>
                         </div>
                     </div>
+
                 }
             }
             else
             {
-                <b>Новостей нет</b>    
-            
+                <p>Событий не найдено</p>
             }
-            </div>
+        </div>
+        <div class="col-sm-8">
+            <b class="m-3">Новости</b>
+            <div class="row">
+                @if (rssItems.Count > 0)
+                {
+                    @foreach (var news in rssItems)
+                    {
+                        <div class="col-5 m-3">
+                            <div class="card" style="width:100%;height:100%">
+                                <div class="card-img">
+                                    <img src="@news.Image" style="height:200px;justify-self:center;display:flex" />
+                                </div>
+                                <div class="card-body bg-success text-light">
+                                    <p><b>@news.Title</b></p>
+                                    <p>@news.Description</p>
+                                    <p><b>@news.PubDate.ToShortDateString()</b></p>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p>Новостей нет</p>
+
+                }
             </div>
         </div>
 
@@ -99,13 +129,15 @@
 {
     List<Employee> employees = new();
     List<RssItem> rssItems = new();
+    List<EventItem> eventItems = new();
 
     string qrcode = "";
     string invis = "visibility:collapse;z-index:-1";
 
     string _search = "";
-    string Search { 
-        get => _search; 
+    string Search
+    {
+        get => _search;
         set
         {
             _search = value;
@@ -118,9 +150,37 @@
         invis = "visibility:collapse;z-index:-1";
     }
 
+    void EventIcsDownload(EventItem eventItem)
+    {
+        string ics = "BEGIN:VCALENDAR\n" +
+        "VERSION:2.0\n" +
+        "BEGIN:VEVENT\n" +
+        $"SUMMARY:{eventItem.Summary}\n" +
+        $"DTSTART:{eventItem.DtStart.ToString("ddMMyyyyThhmmssZ")}\n" +
+        $"DTEND:{eventItem.DtEnd.ToString("ddMMyyyyThhmmssZ")}\n" +
+        $"DTSTAMP:{eventItem.DtStamp.ToString("ddMMyyyyThhmmssZ")}\n" +
+        $"UID:{eventItem.Uid}\n" +
+        $"DESCRIPTION:{eventItem.Description}\n" +
+        $"LOCATION:{eventItem.Location}\n" +
+        $"ORGANIZER:{eventItem.Organizer}\n" +
+        "STATUS:CONFIRMED\n" +
+        "PRIORITY:0\n" +
+        "END:VEVENT\n" +
+        "END:VCALENDAR";
+
+        string path = Path.Combine(Environment.CurrentDirectory,
+            "wwwroot", "ics", eventItem.Uid.ToString() + ".ics");
+        File.WriteAllText(path, ics);
+
+        string url = "http://localhost:5050/ics/" + eventItem.Uid.ToString() + ".ics";
+
+        nav.NavigateTo(url, true);
+
+    }
+
     void QRCode(Employee employee)
     {
-        string message = 
+        string message =
          "BEGIN:VCARD\n" +
          "VERSION:3.0\n" +
          $"N:{employee.LastName}\n" +
@@ -140,15 +200,35 @@
     void StartSearch()
     {
         var x = _search.ToLower();
-        employees = db.Employees.Include(s=>s.IdRoleNavigation).Where(s => 
+        employees = db.Employees.Include(s => s.IdRoleNavigation).Where(s =>
             s.LastName.ToLower().Contains(x) ||
             s.FirstName.ToLower().Contains(x)
         ).ToList();
 
-        StartRss();
+        SearchRss();
+        SearchEvents();
     }
 
-    async void StartRss()
+    async void SearchEvents()
+    {
+        var x = _search.ToLower();
+
+        try
+        {
+            var events = await client.GetFromJsonAsync<List<EventItem>>("Events");
+
+            eventItems = events.Where(s => s.Description.ToLower().Contains(x) ||
+                s.Summary.ToLower().Contains(x)).ToList();
+        }
+        catch
+        {
+
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    async void SearchRss()
     {
         var x = _search.ToLower();
 
@@ -176,6 +256,8 @@
         InvokeAsync(StateHasChanged);
     }
 
+    Timer timer;
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
@@ -183,6 +265,16 @@
         client.BaseAddress = new Uri("http://localhost:5000/");
         StartSearch();
 
+        timer = new Timer(s =>
+        {
+            StartSearch();
+        }, null, 15000, 15000);
+    }
+
+    public void Dispose()
+    {
+        timer.Change(0, 0);
+        timer.Dispose();
     }
 
 }

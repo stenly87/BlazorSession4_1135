@@ -1,0 +1,109 @@
+﻿<div class="m-3">
+    <h3>Календарь</h3>
+    <div class="row bg-success m-3">
+        <div class="col-2">
+            <p @onclick="(()=>AddMonth(-1))">&lt;</p>
+        </div>
+        <div class="col-8 text-center">
+            @calendDay.ToString("MMMM yyyy")
+        </div>
+        <div class="col-2 text-end">
+            <p @onclick="(()=>AddMonth(1))">&gt;</p>
+        </div>
+    </div>
+    <div class="row m-3">
+        <table class="table table-borderless m-3" style="width:100%">
+            <thead>
+                <tr>
+                    <th>П</th>
+                    <th>В</th>
+                    <th>С</th>
+                    <th>Ч</th>
+                    <th>П</th>
+                    <th>С</th>
+                    <th>В</th>
+                </tr>
+            </thead>
+            <tbody>
+                @while (true)
+                {
+                    <tr>
+                        @for (int i = 1; i <= 7; i++)
+                        {
+                            @((MarkupString)TestDay())
+                        }
+                    </tr>
+                    @if (stop)
+                        break;
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+
+    DateTime today = DateTime.Now;
+    DateTime calendDay;
+    bool draw;
+    bool stop = false;
+    int totalDays = 0;
+    int startWeek = 0;
+    int index = 0;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        calendDay = today;
+
+        Redraw();
+    }
+
+    void Redraw()
+    {
+        stop = false;
+        draw = false;
+        index = 0;
+        temp = 0;
+        var dayWeek = (int)new DateTime(calendDay.Year, calendDay.Month, 1).DayOfWeek;
+        if (dayWeek == 0)
+            dayWeek = 7;
+        startWeek = dayWeek;
+        totalDays = DateTime.DaysInMonth(calendDay.Year, calendDay.Month);
+    }
+
+    int temp;
+    string TestDay()
+    {
+        if (draw)
+        {
+            index++;
+            if (index <= totalDays)
+            {
+                DateTime date = new DateTime(calendDay.Year, calendDay.Month, index);
+                // здесь можно сгенерировать html ячейки с картинками/обводками/событиями и подписями
+                return $"<td>{index}</td>";
+            }
+            else
+                stop = true;
+        }
+        else
+        {
+            startWeek--;
+            if (startWeek == 0)
+            {
+                draw = true;
+                index++;
+                return "<td>1</td>";
+            }
+        }
+        return "<td></td>";
+    }
+
+    void AddMonth(int m)
+    {
+        calendDay = calendDay.AddMonths(m);
+        Redraw();
+        InvokeAsync(StateHasChanged);
+    }
+}
